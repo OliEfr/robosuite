@@ -41,4 +41,4 @@ SPACEMOUSE_PRODUCT_ID = 50741
 # If LOGGING LEVEL is set to None, the logger will be turned off
 CONSOLE_LOGGING_LEVEL = "WARN"
 # File logging is written to /tmp/robosuite.log by default
-FILE_LOGGING_LEVEL = "DEBUG"
+FILE_LOGGING_LEVEL = None

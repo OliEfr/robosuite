@@ -48,6 +48,8 @@ class DataCollectionWrapper(Wrapper):
 
         # remember whether any environment interaction has occurred
         self.has_interaction = False
+        self.t = 0
+        self.started_new_episode = False
 
         # some variables for remembering the current episode's initial state and model xml
         self._current_task_instance_state = None
@@ -57,6 +59,8 @@ class DataCollectionWrapper(Wrapper):
         """
         Bookkeeping to do at the start of each new episode.
         """
+        self.started_new_episode = True
+
 
         # flush any data left over from the previous episode if any interactions have happened
         if self.has_interaction:
@@ -76,6 +80,8 @@ class DataCollectionWrapper(Wrapper):
         self.env.sim.reset()
         self.env.sim.set_state_from_flattened(self._current_task_instance_state)
         self.env.sim.forward()
+
+        print("Started new episode recording.")
 
     def _on_first_interaction(self):
         """
@@ -106,6 +112,9 @@ class DataCollectionWrapper(Wrapper):
         assert len(self.states) == 0
         self.states.append(self._current_task_instance_state)
 
+
+        print("Registered first env interaction on recording.")
+
     def _flush(self):
         """
         Method to flush internal state to disk.
@@ -134,8 +143,9 @@ class DataCollectionWrapper(Wrapper):
         Returns:
             OrderedDict: Environment observation space after reset occurs
         """
+        self.started_new_episode = False
         ret = super().reset()
-        self._start_new_episode()
+        # self._start_new_episode() # handled manually during data collection
         return ret
 
     def step(self, action):
@@ -157,11 +167,11 @@ class DataCollectionWrapper(Wrapper):
         self.t += 1
 
         # on the first time step, make directories for logging
-        if not self.has_interaction:
+        if not self.has_interaction and self.started_new_episode:
             self._on_first_interaction()
 
         # collect the current simulation state if necessary
-        if self.t % self.collect_freq == 0:
+        if self.t % self.collect_freq == 0 and self.started_new_episode:
             state = self.env.sim.get_state().flatten()
             self.states.append(state)
 
@@ -174,7 +184,7 @@ class DataCollectionWrapper(Wrapper):
             self.successful = True
 
         # flush collected data to disk if necessary
-        if self.t % self.flush_freq == 0:
+        if self.t % self.flush_freq == 0 and self.started_new_episode:
             self._flush()
 
         return ret
