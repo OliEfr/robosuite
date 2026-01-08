@@ -30,6 +30,8 @@ class DataCollectionWrapper(Wrapper):
 
         # in-memory cache for simulation states and action info
         self.states = []
+        self.subtasks = []
+        self.current_subtask = 0
         self.action_infos = []  # stores information about actions taken
         self.successful = False  # stores success state of demonstration
 
@@ -81,6 +83,13 @@ class DataCollectionWrapper(Wrapper):
         self.env.sim.set_state_from_flattened(self._current_task_instance_state)
         self.env.sim.forward()
 
+        # Reset controller goals and initial joints to match the current robot state.
+        # This prevents the robot from "springing back" to the default pose because initial_joint is used for nullspace torques that push joints toward it
+        for robot in self.env.robots:
+            # Update initial_joint to current joints - this stops nullspace torques
+            # from pushing the robot back to default joint configuration
+            robot.controller.update_initial_joints(robot.controller.joint_pos)
+
         print("Started new episode recording.")
 
     def _on_first_interaction(self):
@@ -111,7 +120,7 @@ class DataCollectionWrapper(Wrapper):
         # save initial state and action
         assert len(self.states) == 0
         self.states.append(self._current_task_instance_state)
-
+        self.subtasks.append(self.current_subtask)
 
         print("Registered first env interaction on recording.")
 
@@ -131,9 +140,11 @@ class DataCollectionWrapper(Wrapper):
             action_infos=self.action_infos,
             successful=self.successful,
             env=env_name,
+            subtasks=self.subtasks,
         )
         self.states = []
         self.action_infos = []
+        self.subtasks = []
         self.successful = False
 
     def reset(self):
@@ -178,6 +189,8 @@ class DataCollectionWrapper(Wrapper):
             info = {}
             info["actions"] = np.array(action)
             self.action_infos.append(info)
+
+            self.subtasks.append(self.current_subtask)
 
         # check if the demonstration is successful
         if self.env._check_success():
